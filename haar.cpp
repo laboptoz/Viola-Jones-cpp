@@ -34,7 +34,9 @@
 #include "haar.h"
 #include "image.h"
 #include <stdio.h>
+#include <pthread.h>
 #include "stdio-wrapper.h"
+#include <unistd.h>
 
 /* TODO: use matrices */
 /* classifier parameters */
@@ -104,7 +106,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   MyIntImage *sqsum1 = &sqsum1Obj;
 
   /********************************************************
-   * allCandidates is the preliminaray face candidate,
+   * allCandidates is the preliminary face candidate,
    * which will be refined later.
    *
    * std::vector is a sequential container
@@ -386,7 +388,51 @@ inline int evalWeakClassifier(int variance_norm_factor, int p_offset, int tree_i
 
 }
 
+struct CalculateStateSumArgs
+{
+    int p_offset;
+    int i;
+    unsigned int variance_norm_factor;
+    int haar_counter;
+    int w_index;
+    int r_index;
+    int sum;
+};
 
+
+void * calculateStateSum(void* args) {
+  /****************************************************
+       * A shared variable that induces false dependency
+       *
+       * To avoid it from limiting parallelism,
+       * we can duplicate it multiple times,
+       * e.g., using stage_sum_array[number_of_threads].
+       * Then threads only need to sync at the end
+       ***************************************************/
+  CalculateStateSumArgs *p = (CalculateStateSumArgs*)args;
+
+  int stage_sum = 0;
+  for (int j = 0; j < stages_array[p->i]; j++) {
+    /**************************************************
+     * Send the shifted window to a haar filter.
+     **************************************************/
+    stage_sum += evalWeakClassifier(p->variance_norm_factor, p->p_offset, p->haar_counter, p->w_index, p->r_index);
+    p->haar_counter++;
+    p->w_index += 3;
+    p->r_index += 12;
+  } /* end of j loop */
+
+  p->sum = stage_sum;
+  /**************************************************************
+   * threshold of the stage.
+   * If the sum is below the threshold,
+   * no faces are detected,
+   * and the search is abandoned at the i-th stage (-i).
+   * Otherwise, a face is detected (1)
+   **************************************************************/
+
+  return NULL;
+}
 
 int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
 {
@@ -398,7 +444,6 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
   int haar_counter = 0;
   int w_index = 0;
   int r_index = 0;
-  int stage_sum;
   myCascade* cascade;
   cascade = _cascade;
 
@@ -460,20 +505,35 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
        * e.g., using stage_sum_array[number_of_threads].
        * Then threads only need to sync at the end
        ***************************************************/
-      stage_sum = 0;
+      CalculateStateSumArgs **args = (CalculateStateSumArgs **) malloc(stages_array[i] * sizeof(CalculateStateSumArgs));
+      for (j = 0; j < stages_array[i]; j++) {
+        /**************************************************
+         * Send the shifted window to a haar filter.
+         **************************************************/
 
-      for( j = 0; j < stages_array[i]; j++ )
-	{
-	  /**************************************************
-	   * Send the shifted window to a haar filter.
-	   **************************************************/
-	  stage_sum += evalWeakClassifier(variance_norm_factor, p_offset, haar_counter, w_index, r_index);
-	  n_features++;
-	  haar_counter++;
-	  w_index+=3;
-	  r_index+=12;
-	} /* end of j loop */
+        pthread_t calculateStateSumThread;
+        args[i] = (CalculateStateSumArgs *)malloc(sizeof(CalculateStateSumArgs));
+        args[i]->p_offset = p_offset;
+        args[i]->variance_norm_factor = variance_norm_factor;
+        args[i]->i = i;
+        args[i]->haar_counter = haar_counter;
+        args[i]->w_index = w_index;
+        args[i]->r_index = r_index;
+        pthread_create(&calculateStateSumThread, NULL, calculateStateSum, (void*) args[i]);
+        pthread_join(calculateStateSumThread, NULL);
 
+//        stage_sum += evalWeakClassifier(variance_norm_factor, p_offset, haar_counter, w_index, r_index);
+        n_features++;
+        haar_counter++;
+        w_index += 3;
+        r_index += 12;
+      } /* end of j loop */
+		
+      // wait until above thread finishes
+      int stage_sum = 0;
+      for (j = 0; j < stages_array[i]; j++) {
+        stage_sum += args[i]->sum;
+      }
       /**************************************************************
        * threshold of the stage.
        * If the sum is below the threshold,
@@ -483,8 +543,8 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
        **************************************************************/
 
       /* the number "0.4" is empirically chosen for 5kk73 */
-      if( stage_sum < 0.4*stages_thresh_array[i] ){
-	return -i;
+      if (stage_sum < 0.4 * stages_thresh_array[i]) {
+        return -i;
       } /* end of the per-stage thresholding */
     } /* end of i loop */
   return 1;
@@ -523,6 +583,7 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
    * example:
    * step = factor > 2 ? 1 : 2;
    *
+
    * For 5kk73,
    * the factor and step can be kept constant,
    * unless you want to change input image.
@@ -552,8 +613,11 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	 * Optimization Oppotunity:
 	 * The same cascade filter is used each time
 	 ********************************************/
-	result = runCascadeClassifier( cascade, p, 0 );
+	 result = runCascadeClassifier( cascade, p, 0 );
 
+
+	//boost::thread t1(runCascadeClassifier( cascade, p, 0 ));
+    //result = t1.join();
 	/*******************************************************
 	 * If a face is detected,
 	 * record the coordinates of the filter window
@@ -648,11 +712,11 @@ void nearestNeighbor (MyImage *src, MyImage *dst)
       p = src_data + y*w1;
       rat = 0;
       for (j=0;j<w2;j++)
-	{
-	  x = (rat>>16);
-	  *t++ = p[x];
-	  rat += x_ratio;
-	}
+        {
+            x = (rat>>16);
+            *t++ = p[x];
+            rat += x_ratio;
+        }
     }
 }
 
