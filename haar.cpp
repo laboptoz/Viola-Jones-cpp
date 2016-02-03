@@ -34,9 +34,8 @@
 #include "haar.h"
 #include "image.h"
 #include <stdio.h>
-#include <pthread.h>
 #include "stdio-wrapper.h"
-#include <unistd.h>
+#include <pthread.h>
 
 /* TODO: use matrices */
 /* classifier parameters */
@@ -59,8 +58,20 @@ static int **scaled_rectangles_array;
 int clock_counter = 0;
 float n_features = 0;
 
-
 int iter_counter = 0;
+
+pthread_mutex_t lock;
+
+struct ScaleImageInvokerArgs
+{
+	myCascade* _cascade;
+	float _factor;
+	int sum_row;
+	int sum_col;
+	std::vector<MyRect>& _vec;
+};
+
+void * CalculateScaleImage (void* myArgs);
 
 /* compute integral images */
 void integralImages( MyImage *src, MyIntImage *sum, MyIntImage *sqsum );
@@ -106,7 +117,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   MyIntImage *sqsum1 = &sqsum1Obj;
 
   /********************************************************
-   * allCandidates is the preliminary face candidate,
+   * allCandidates is the preliminaray face candidate,
    * which will be refined later.
    *
    * std::vector is a sequential container
@@ -116,6 +127,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
    * MyRect struct keeps the info of a rectangle (see haar.h)
    * The rectangle contains one face candidate
    *****************************************************/
+  
   std::vector<MyRect> allCandidates;
 
   /* scaling factor */
@@ -140,10 +152,15 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
 
   /* initial scaling factor */
   factor = 1;
+  int thread_id = 0;
+  ScaleImageInvokerArgs *args[8];
+  pthread_t threadPool[8];
+  pthread_mutex_init(&lock, NULL);
 
   /* iterate over the image pyramid */
-  for( factor = 1; ; factor *= scaleFactor )
-    {
+  //for( factor = 1; ; factor *= scaleFactor )
+  for (factor = 1; factor < 9; factor++)
+   {
       /* iteration counter */
       iter_counter++;
 
@@ -211,20 +228,41 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
        * Optimization oppurtunity:
        * the same cascade filter is invoked each time
        ***************************************************/
-      ScaleImage_Invoker(cascade, factor, sum1->height, sum1->width,
+        args[thread_id] = (ScaleImageInvokerArgs *)malloc(sizeof(ScaleImageInvokerArgs));
+	args[thread_id]->_cascade = cascade;
+	args[thread_id]->_factor = factor;
+	args[thread_id]->sum_row = sum1->height;
+	args[thread_id]->sum_col = sum1->width;
+	pthread_mutex_lock(&lock);
+	args[thread_id]->_vec = allCandidates;
+	pthread_mutex_unlock(&lock);
+	//thread_id++;
+	ScaleImage_Invoker(cascade, factor, sum1->height, sum1->width,
 			 allCandidates);
     } /* end of the factor loop, finish all scales in pyramid*/
 
-  if( minNeighbors != 0)
+    if( minNeighbors != 0)
     {
       groupRectangles(allCandidates, minNeighbors, GROUP_EPS);
     }
+
+    for (int i = 0; i< 8; i++)
+    {
+	//pthread_create(&threadPool[i], NULL, CalculateScaleImage, (void*) args[i]);
+	//pthread_join(threadPool[i], NULL);	
+}   
 
   freeImage(img1);
   freeSumImage(sum1);
   freeSumImage(sqsum1);
   return allCandidates;
 
+}
+
+void * CalculateScaleImage (void * myArgs)
+{
+	ScaleImageInvokerArgs *p = (ScaleImageInvokerArgs*)myArgs;
+	ScaleImage_Invoker(p->_cascade, p->_factor, p->sum_row, p->sum_col, p->_vec);
 }
 
 /***********************************************
@@ -388,51 +426,7 @@ inline int evalWeakClassifier(int variance_norm_factor, int p_offset, int tree_i
 
 }
 
-struct CalculateStateSumArgs
-{
-    int p_offset;
-    int i;
-    unsigned int variance_norm_factor;
-    int haar_counter;
-    int w_index;
-    int r_index;
-    int sum;
-};
 
-
-void * calculateStateSum(void* args) {
-  /****************************************************
-       * A shared variable that induces false dependency
-       *
-       * To avoid it from limiting parallelism,
-       * we can duplicate it multiple times,
-       * e.g., using stage_sum_array[number_of_threads].
-       * Then threads only need to sync at the end
-       ***************************************************/
-  CalculateStateSumArgs *p = (CalculateStateSumArgs*)args;
-
-  int stage_sum = 0;
-  for (int j = 0; j < stages_array[p->i]; j++) {
-    /**************************************************
-     * Send the shifted window to a haar filter.
-     **************************************************/
-    stage_sum += evalWeakClassifier(p->variance_norm_factor, p->p_offset, p->haar_counter, p->w_index, p->r_index);
-    p->haar_counter++;
-    p->w_index += 3;
-    p->r_index += 12;
-  } /* end of j loop */
-
-  p->sum = stage_sum;
-  /**************************************************************
-   * threshold of the stage.
-   * If the sum is below the threshold,
-   * no faces are detected,
-   * and the search is abandoned at the i-th stage (-i).
-   * Otherwise, a face is detected (1)
-   **************************************************************/
-
-  return NULL;
-}
 
 int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
 {
@@ -444,6 +438,7 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
   int haar_counter = 0;
   int w_index = 0;
   int r_index = 0;
+  int stage_sum;
   myCascade* cascade;
   cascade = _cascade;
 
@@ -505,35 +500,20 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
        * e.g., using stage_sum_array[number_of_threads].
        * Then threads only need to sync at the end
        ***************************************************/
-      CalculateStateSumArgs **args = (CalculateStateSumArgs **) malloc(stages_array[i] * sizeof(CalculateStateSumArgs));
-      for (j = 0; j < stages_array[i]; j++) {
-        /**************************************************
-         * Send the shifted window to a haar filter.
-         **************************************************/
+      stage_sum = 0;
 
-        pthread_t calculateStateSumThread;
-        args[i] = (CalculateStateSumArgs *)malloc(sizeof(CalculateStateSumArgs));
-        args[i]->p_offset = p_offset;
-        args[i]->variance_norm_factor = variance_norm_factor;
-        args[i]->i = i;
-        args[i]->haar_counter = haar_counter;
-        args[i]->w_index = w_index;
-        args[i]->r_index = r_index;
-        pthread_create(&calculateStateSumThread, NULL, calculateStateSum, (void*) args[i]);
-        pthread_join(calculateStateSumThread, NULL);
+      for( j = 0; j < stages_array[i]; j++ )
+	{
+	  /**************************************************
+	   * Send the shifted window to a haar filter.
+	   **************************************************/
+	  stage_sum += evalWeakClassifier(variance_norm_factor, p_offset, haar_counter, w_index, r_index);
+	  n_features++;
+	  haar_counter++;
+	  w_index+=3;
+	  r_index+=12;
+	} /* end of j loop */
 
-//        stage_sum += evalWeakClassifier(variance_norm_factor, p_offset, haar_counter, w_index, r_index);
-        n_features++;
-        haar_counter++;
-        w_index += 3;
-        r_index += 12;
-      } /* end of j loop */
-		
-      // wait until above thread finishes
-      int stage_sum = 0;
-      for (j = 0; j < stages_array[i]; j++) {
-        stage_sum += args[i]->sum;
-      }
       /**************************************************************
        * threshold of the stage.
        * If the sum is below the threshold,
@@ -543,8 +523,8 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
        **************************************************************/
 
       /* the number "0.4" is empirically chosen for 5kk73 */
-      if (stage_sum < 0.4 * stages_thresh_array[i]) {
-        return -i;
+      if( stage_sum < 0.4*stages_thresh_array[i] ){
+	return -i;
       } /* end of the per-stage thresholding */
     } /* end of i loop */
   return 1;
@@ -583,7 +563,6 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
    * example:
    * step = factor > 2 ? 1 : 2;
    *
-
    * For 5kk73,
    * the factor and step can be kept constant,
    * unless you want to change input image.
@@ -613,11 +592,8 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	 * Optimization Oppotunity:
 	 * The same cascade filter is used each time
 	 ********************************************/
-	 result = runCascadeClassifier( cascade, p, 0 );
+	result = runCascadeClassifier( cascade, p, 0 );
 
-
-	//boost::thread t1(runCascadeClassifier( cascade, p, 0 ));
-    //result = t1.join();
 	/*******************************************************
 	 * If a face is detected,
 	 * record the coordinates of the filter window
@@ -633,7 +609,9 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	if( result > 0 )
 	  {
 	    MyRect r = {myRound(x*factor), myRound(y*factor), winSize.width, winSize.height};
+	    //pthread_mutex_lock(&lock);
 	    vec->push_back(r);
+	    //pthread_mutex_unlock(&lock);
 	  }
       }
 }
@@ -712,11 +690,11 @@ void nearestNeighbor (MyImage *src, MyImage *dst)
       p = src_data + y*w1;
       rat = 0;
       for (j=0;j<w2;j++)
-        {
-            x = (rat>>16);
-            *t++ = p[x];
-            rat += x_ratio;
-        }
+	{
+	  x = (rat>>16);
+	  *t++ = p[x];
+	  rat += x_ratio;
+	}
     }
 }
 
