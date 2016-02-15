@@ -154,13 +154,13 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   /* initial scaling factor */
   factor = 1;
   int thread_id = 0;
-  ScaleImageInvokerArgs *args[2];
-  pthread_t threadPool[2];
+  ScaleImageInvokerArgs *args[1];
+  pthread_t threadPool[1];
   pthread_mutex_init(&lock, NULL);
 
   /* iterate over the image pyramid */
   //for( factor = 1; ; factor *= scaleFactor )
-  for (factor = 1; factor <3; factor++)
+  for (factor = 1; factor <2; factor++)
    {
       /* iteration counter */
       iter_counter++;
@@ -236,20 +236,10 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
         args[thread_id]->sum_row = sum1->height;
         args[thread_id]->sum_col = sum1->width;
 
+        thread_id++;
+        }
 
-	//pthread_mutex_lock(&lock);
-	//args[thread_id]->_vec = allCandidates;
-	//pthread_mutex_unlock(&lock);
-	//ScaleImage_Invoker(cascade, factor, sum1->height, sum1->width,
-	//		 allCandidates);
-    } /* end of the factor loop, finish all scales in pyramid*/
-
-    //if( minNeighbors != 0)
-    //{
-    //  groupRectangles(allCandidates, minNeighbors, GROUP_EPS);
-    //}
-
-    for (int i = 0; i< 2; i++)
+    for (int i = 0; i< 1; i++)
     {
         printf("thread id: %d\n",i);
 
@@ -263,13 +253,6 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
         pthread_join(threadPool[i], NULL);
         printf("pthread_join value for thread %d: %d\n", i, val2);
     }
-
-    /*for (int i = 0; i< 8; i++)
-    {
-	int val = -1;
-        val = pthread_join(threadPool[i], NULL);
-	printf("pthread join value: %d\n", val);
-    }*/
 
     if (minNeighbors != 0)
     {
@@ -617,10 +600,10 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	 * Optimization Oppotunity:
 	 * The same cascade filter is used each time
 	 ********************************************/
-	pthread_mutex_lock(&lock);
+	//pthread_mutex_lock(&lock);
 	result = runCascadeClassifier( cascade, p, 0 );
-	pthread_mutex_unlock(&lock);
-	printf("result= %d\n",result);
+	//pthread_mutex_unlock(&lock);
+	//printf("result= %d\n",result);
 
 	/*******************************************************
 	 * If a face is detected,
