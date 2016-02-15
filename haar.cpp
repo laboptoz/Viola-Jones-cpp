@@ -54,6 +54,7 @@ static int *tree_thresh_array;
 static int *stages_thresh_array;
 static int **scaled_rectangles_array;
 
+std::vector<MyRect> allCandidates;
 
 int clock_counter = 0;
 float n_features = 0;
@@ -68,7 +69,7 @@ struct ScaleImageInvokerArgs
 	float _factor;
 	int sum_row;
 	int sum_col;
-	std::vector<MyRect>& _vec;
+	//std::vector<MyRect>& _vec;
 };
 
 void * CalculateScaleImage (void* myArgs);
@@ -77,7 +78,7 @@ void * CalculateScaleImage (void* myArgs);
 void integralImages( MyImage *src, MyIntImage *sum, MyIntImage *sqsum );
 
 /* scale down the image */
-void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int sum_col, std::vector<MyRect>& _vec);
+void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int sum_col);// std::vector<MyRect>& _vec);
 
 /* compute scaled image */
 void nearestNeighbor (MyImage *src, MyImage *dst);
@@ -127,8 +128,8 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
    * MyRect struct keeps the info of a rectangle (see haar.h)
    * The rectangle contains one face candidate
    *****************************************************/
-  
-  std::vector<MyRect> allCandidates;
+
+  //std::vector<MyRect> allCandidates;
 
   /* scaling factor */
   float factor;
@@ -153,13 +154,13 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   /* initial scaling factor */
   factor = 1;
   int thread_id = 0;
-  ScaleImageInvokerArgs *args[8];
-  pthread_t threadPool[8];
+  ScaleImageInvokerArgs *args[2];
+  pthread_t threadPool[2];
   pthread_mutex_init(&lock, NULL);
 
   /* iterate over the image pyramid */
   //for( factor = 1; ; factor *= scaleFactor )
-  for (factor = 1; factor < 9; factor++)
+  for (factor = 1; factor <3; factor++)
    {
       /* iteration counter */
       iter_counter++;
@@ -220,7 +221,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
       setImageForCascadeClassifier( cascade, sum1, sqsum1);
 
       /* print out for each scale of the image pyramid */
-      printf("detecting faces, iter := %d\n", iter_counter);
+      //printf("detecting faces, iter := %d\n", iter_counter);
 
       /****************************************************
        * Process the current scale with the cascaded fitler.
@@ -228,29 +229,53 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
        * Optimization oppurtunity:
        * the same cascade filter is invoked each time
        ***************************************************/
+
         args[thread_id] = (ScaleImageInvokerArgs *)malloc(sizeof(ScaleImageInvokerArgs));
-	args[thread_id]->_cascade = cascade;
-	args[thread_id]->_factor = factor;
-	args[thread_id]->sum_row = sum1->height;
-	args[thread_id]->sum_col = sum1->width;
-	pthread_mutex_lock(&lock);
-	args[thread_id]->_vec = allCandidates;
-	pthread_mutex_unlock(&lock);
-	//thread_id++;
-	ScaleImage_Invoker(cascade, factor, sum1->height, sum1->width,
-			 allCandidates);
+        args[thread_id]->_cascade = cascade;
+        args[thread_id]->_factor = factor;
+        args[thread_id]->sum_row = sum1->height;
+        args[thread_id]->sum_col = sum1->width;
+
+
+	//pthread_mutex_lock(&lock);
+	//args[thread_id]->_vec = allCandidates;
+	//pthread_mutex_unlock(&lock);
+	//ScaleImage_Invoker(cascade, factor, sum1->height, sum1->width,
+	//		 allCandidates);
     } /* end of the factor loop, finish all scales in pyramid*/
 
-    if( minNeighbors != 0)
+    //if( minNeighbors != 0)
+    //{
+    //  groupRectangles(allCandidates, minNeighbors, GROUP_EPS);
+    //}
+
+    for (int i = 0; i< 2; i++)
     {
-      groupRectangles(allCandidates, minNeighbors, GROUP_EPS);
+        printf("thread id: %d\n",i);
+
+        int val = -1;
+        int val2 = -1;
+
+        val = pthread_create(&threadPool[i], NULL, CalculateScaleImage, (void*) args[i]);
+        printf("pthreadcreate value for thread %d: %d\n",i, val);
+
+        val2 = pthread_join(threadPool[i], NULL);
+        pthread_join(threadPool[i], NULL);
+        printf("pthread_join value for thread %d: %d\n", i, val2);
     }
 
-    for (int i = 0; i< 8; i++)
+    /*for (int i = 0; i< 8; i++)
     {
-	//pthread_create(&threadPool[i], NULL, CalculateScaleImage, (void*) args[i]);
-	//pthread_join(threadPool[i], NULL);	
-}   
+	int val = -1;
+        val = pthread_join(threadPool[i], NULL);
+	printf("pthread join value: %d\n", val);
+    }*/
+
+    if (minNeighbors != 0)
+    {
+	groupRectangles(allCandidates,minNeighbors, GROUP_EPS);
+    }
+
 
   freeImage(img1);
   freeSumImage(sum1);
@@ -262,7 +287,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
 void * CalculateScaleImage (void * myArgs)
 {
 	ScaleImageInvokerArgs *p = (ScaleImageInvokerArgs*)myArgs;
-	ScaleImage_Invoker(p->_cascade, p->_factor, p->sum_row, p->sum_col, p->_vec);
+	ScaleImage_Invoker(p->_cascade, p->_factor, p->sum_row, p->sum_col);// p->_vec);
 }
 
 /***********************************************
@@ -531,7 +556,7 @@ int runCascadeClassifier( myCascade* _cascade, MyPoint pt, int start_stage )
 }
 
 
-void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int sum_col, std::vector<MyRect>& _vec)
+void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int sum_col)// std::vector<MyRect>& _vec)
 {
 
   myCascade* cascade = _cascade;
@@ -540,7 +565,7 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
   MyPoint p;
   int result;
   int y1, y2, x2, x, y, step;
-  std::vector<MyRect> *vec = &_vec;
+  std::vector<MyRect> *vec = &allCandidates; //&_vec
 
   MySize winSize0 = cascade->orig_window_size;
   MySize winSize;
@@ -592,7 +617,10 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	 * Optimization Oppotunity:
 	 * The same cascade filter is used each time
 	 ********************************************/
+	pthread_mutex_lock(&lock);
 	result = runCascadeClassifier( cascade, p, 0 );
+	pthread_mutex_unlock(&lock);
+	printf("result= %d\n",result);
 
 	/*******************************************************
 	 * If a face is detected,
@@ -608,9 +636,12 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	 *******************************************************/
 	if( result > 0 )
 	  {
+	    //printf("THREAD GOT TO THIS POINT!!");
 	    MyRect r = {myRound(x*factor), myRound(y*factor), winSize.width, winSize.height};
 	    //pthread_mutex_lock(&lock);
+
 	    vec->push_back(r);
+	    //allCandidates->push_back(r);
 	    //pthread_mutex_unlock(&lock);
 	  }
       }

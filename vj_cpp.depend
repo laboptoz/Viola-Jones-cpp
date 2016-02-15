@@ -5,6 +5,8 @@
 	<stdio.h>
 	"stdio-wrapper.h"
 
+1444890396 pper.h"
+
 1354412264 c:\users\peter\documents\codeblocksprojects\vj_cpp\haar.h
 	<stdio.h>
 	<stdlib.h>
@@ -16,6 +18,8 @@
 	<stdio.h>
 	<stdlib.h>
 	<string.h>
+
+1445223651 
 
 1354412206 c:\users\peter\documents\codeblocksprojects\vj_cpp\stdio-wrapper.h
 	<sysace_stdio.h>
@@ -37,10 +41,58 @@
 	<sysace_stdio.h>
 	<fat.h>
 
+1354412190 dio.h>
+
 1445223651 source:c:\users\peter\documents\codeblocksprojects\vj_cpp\main.cpp
 	<stdio.h>
 	<stdlib.h>
 	"image.h"
 	"stdio-wrapper.h"
+	"haar.h"
+
+1444890396 source:/users/majors/dsaxena/vj_feb8/image.c
+	<stdio.h>
+	<string.h>
+	<ctype.h>
+	"image.h"
+	"stdio-wrapper.h"
+
+1354219156 /users/majors/dsaxena/vj_feb8/image.h
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+
+1354408606 /users/majors/dsaxena/vj_feb8/stdio-wrapper.h
+	<sysace_stdio.h>
+	<stdio.h>
+
+1354408590 source:/users/majors/dsaxena/vj_feb8/stdio-wrapper.c
+	"stdio-wrapper.h"
+	<filestatus.h>
+	<sysace_stdio.h>
+	<fat.h>
+
+1455575407 source:/users/majors/dsaxena/vj_feb8/haar.cpp
+	"haar.h"
+	"image.h"
+	<stdio.h>
+	"stdio-wrapper.h"
+	<pthread.h>
+
+1455119018 /users/majors/dsaxena/vj_feb8/haar.h
+	<stdio.h>
+	<stdlib.h>
+	"image.h"
+	<vector>
+	"stdio-wrapper.h"
+
+1455135515 source:/users/majors/dsaxena/vj_feb8/main.cpp
+	<stdio.h>
+	<stdlib.h>
+	"image.h"
+	"stdio-wrapper.h"
+	"haar.h"
+
+1455136155 source:/users/majors/dsaxena/vj_feb8/rectangles.cpp
 	"haar.h"
 
