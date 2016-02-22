@@ -77,8 +77,8 @@ typedef struct myCascade
 // number of stages (22)
     int  n_stages;
     int total_nodes;
-    float scale; 
- 
+    float scale;
+
     // size of the window used in the training set (20 x 20)
     MySize orig_window_size;
 //    MySize real_window_size;
@@ -87,7 +87,7 @@ typedef struct myCascade
 
     MyIntImage sum;
     MyIntImage sqsum;
-   
+
     // pointers to the corner of the actual detection window
     sqsumtype *pq0, *pq1, *pq2, *pq3;
     sumtype *p0, *p1, *p2, *p3;
@@ -118,10 +118,10 @@ void drawRectangle(MyImage* image, MyRect r);
 //		int min_neighbors);
 
 std::vector<MyRect> detectObjects( MyImage* image, MySize minSize, MySize maxSize,
-		myCascade* cascade,
+		myCascade** cascade,
 		float scale_factor,
 		int min_neighbors);
-		
+
 #ifdef __cplusplus
 }
 

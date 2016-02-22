@@ -83,16 +83,29 @@ int main (int argc, char *argv[])
 
 	printf("-- loading cascade classifier --\r\n");
 
-	myCascade cascadeObj;
-	myCascade *cascade = &cascadeObj;
+	/*myCascade cascadeObj;
+	myCascade *cascade = &cascadeObj;*/
+
+	myCascade* cascade[2];
+	myCascade temp0, temp1;
+
 	MySize minSize = {20, 20};
 	MySize maxSize = {0, 0};
 
 	/* classifier properties */
-	cascade->n_stages=25;                   //number of strong classifier stages
-	cascade->total_nodes=2913;              //number of total weak classifier notes in the cascade
-	cascade->orig_window_size.height = 24;  //original window height
-	cascade->orig_window_size.width = 24;   //original window width
+    temp0.n_stages=25;                   //number of strong classifier stages
+	temp0.total_nodes=2913;              //number of total weak classifier notes in the cascade
+	temp0.orig_window_size.height = 24;  //original window height
+	temp0.orig_window_size.width = 24;   //original window width
+
+	cascade[0] = &temp0;
+
+	temp1.n_stages=25;                   //number of strong classifier stages
+	temp1.total_nodes=2913;              //number of total weak classifier notes in the cascade
+	temp1.orig_window_size.height = 24;  //original window height
+	temp1.orig_window_size.width = 24;   //original window width
+
+	cascade[1] = &temp1;
 
 
 	readTextClassifier();
