@@ -157,13 +157,13 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   /* initial scaling factor */
   factor = 1;
   int thread_id = 0;
-  ScaleImageInvokerArgs *args[2];
-  pthread_t threadPool[2];
+  ScaleImageInvokerArgs *args[8];
+  pthread_t threadPool[8];
   pthread_mutex_init(&lock, NULL);
 
   /* iterate over the image pyramid */
   //for( factor = 1; ; factor *= scaleFactor )
-  for (factor = 1; factor <3; factor++)
+  for (factor = 1; factor <9; factor++)
   {
       /* iteration counter */
       iter_counter++;
@@ -239,12 +239,24 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
         args[thread_id]->sum_row = sum1->height;
         args[thread_id]->sum_col = sum1->width;
 
+        printf("thread id: %d\n",thread_id);
+
+        int val = -1;
+        int val2 = -1;
+
+        val = pthread_create(&threadPool[thread_id], NULL, CalculateScaleImage, (void*) args[thread_id]);
+        printf("pthreadcreate value for thread %d: %d\n",thread_id, val);
+
+        val2 = pthread_join(threadPool[thread_id], NULL);
+        pthread_join(threadPool[thread_id], NULL);
+        printf("pthread_join value for thread %d: %d\n", thread_id, val2);
+
         thread_id++;
 
     } /* end of the factor loop, finish all scales in pyramid*/
 
 
-    for (int i = 0; i< 2; i++)
+    /*for (int i = 0; i< 2; i++)
     {
         printf("thread id: %d\n",i);
 
@@ -257,7 +269,7 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
         val2 = pthread_join(threadPool[i], NULL);
         pthread_join(threadPool[i], NULL);
         printf("pthread_join value for thread %d: %d\n", i, val2);
-    }
+    }*/
 
   if( minNeighbors != 0)
     {
