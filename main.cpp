@@ -86,68 +86,23 @@ int main (int argc, char *argv[])
 	/*myCascade cascadeObj;
 	myCascade *cascade = &cascadeObj;*/
 
-	myCascade* cascade[8];
-	myCascade temp0, temp1, temp2, temp3, temp4, temp5, temp6, temp7;
+    int Num_of_CascadesObjs = 8;
+	myCascade* cascade[Num_of_CascadesObjs];
+	myCascade temp0, temp1, temp2, temp3, temp4, temp5, temp6, temp7;//,temp8, temp9, temp10, temp11, temp12, temp13, temp14, temp15, temp16, temp17;
+    myCascade tempArr[Num_of_CascadesObjs] = {temp0, temp1, temp2, temp3, temp4, temp5, temp6, temp7};//,temp8, temp9, temp10, temp11, temp12, temp13, temp14, temp15, temp16, temp17};
 
 	MySize minSize = {20, 20};
 	MySize maxSize = {0, 0};
 
-	/* classifier properties */
-    temp0.n_stages=25;                   //number of strong classifier stages
-	temp0.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp0.orig_window_size.height = 24;  //original window height
-	temp0.orig_window_size.width = 24;   //original window width
-
-	cascade[0] = &temp0;
-
-	temp1.n_stages=25;                   //number of strong classifier stages
-	temp1.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp1.orig_window_size.height = 24;  //original window height
-	temp1.orig_window_size.width = 24;   //original window width
-
-	cascade[1] = &temp1;
-
-	temp2.n_stages=25;                   //number of strong classifier stages
-	temp2.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp2.orig_window_size.height = 24;  //original window height
-	temp2.orig_window_size.width = 24;   //original window width
-
-	cascade[2] = &temp2;
-
-	temp3.n_stages=25;                   //number of strong classifier stages
-	temp3.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp3.orig_window_size.height = 24;  //original window height
-	temp3.orig_window_size.width = 24;   //original window width
-
-	cascade[3] = &temp3;
-
-	temp4.n_stages=25;                   //number of strong classifier stages
-	temp4.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp4.orig_window_size.height = 24;  //original window height
-	temp4.orig_window_size.width = 24;   //original window width
-
-	cascade[4] = &temp4;
-
-	temp5.n_stages=25;                   //number of strong classifier stages
-	temp5.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp5.orig_window_size.height = 24;  //original window height
-	temp5.orig_window_size.width = 24;   //original window width
-
-	cascade[5] = &temp5;
-
-	temp6.n_stages=25;                   //number of strong classifier stages
-	temp6.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp6.orig_window_size.height = 24;  //original window height
-	temp6.orig_window_size.width = 24;   //original window width
-
-	cascade[6] = &temp6;
-
-	temp7.n_stages=25;                   //number of strong classifier stages
-	temp7.total_nodes=2913;              //number of total weak classifier notes in the cascade
-	temp7.orig_window_size.height = 24;  //original window height
-	temp7.orig_window_size.width = 24;   //original window width
-
-	cascade[7] = &temp7;
+    /* classifier properties */
+	for (int i=0;i<Num_of_CascadesObjs; i++)
+	{
+        tempArr[i].n_stages=25;                     //number of strong classifier stages
+        tempArr[i].total_nodes=2913;                //number of total weak classifier notes in the cascade
+        tempArr[i].orig_window_size.height = 24;    //original window height
+        tempArr[i].orig_window_size.width = 24;     //original window width
+        cascade[i] = &tempArr[i];
+	}
 
 	readTextClassifier();
 

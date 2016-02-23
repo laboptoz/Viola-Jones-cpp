@@ -157,13 +157,14 @@ std::vector<MyRect> detectObjects( MyImage* _img, MySize minSize, MySize maxSize
   /* initial scaling factor */
   factor = 1;
   int thread_id = 0;
-  ScaleImageInvokerArgs *args[8];
-  pthread_t threadPool[8];
+  int num_of_threads = 8;
+  ScaleImageInvokerArgs *args[num_of_threads];
+  pthread_t threadPool[num_of_threads];
   pthread_mutex_init(&lock, NULL);
 
   /* iterate over the image pyramid */
   //for( factor = 1; ; factor *= scaleFactor )
-  for (factor = 1; factor <9; factor++)
+  for (factor = 1; factor <num_of_threads+1; factor++)
   {
       /* iteration counter */
       iter_counter++;
@@ -634,7 +635,7 @@ void ScaleImage_Invoker( myCascade* _cascade, float _factor, int sum_row, int su
 	  {
 	    MyRect r = {myRound(x*factor), myRound(y*factor), winSize.width, winSize.height};
 
-            pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
 	    vec->push_back(r);
 	    pthread_mutex_unlock(&lock);
 	  }
